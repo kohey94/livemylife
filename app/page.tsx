@@ -1,103 +1,199 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  const [isRunning, setIsRunning] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [stoppedElapsedMs, setStoppedElapsedMs] = useState(0);
+  const [today, setToday] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [memo, setMemo] = useState('');
+  const [tags, setTags] = useState('');
+  const [records, setRecords] = useState<any[]>([]);
+
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 許可されたユーザー名とパスワード
+  const correctUsername = 'admin';
+  const correctPassword = 'password123';
+
+  useEffect(() => {
+    const stored = localStorage.getItem('records');
+    if (stored) {
+      setRecords(JSON.parse(stored));
+    }
+    setToday(new Date().toLocaleDateString());
+  }, []);
+
+  useEffect(() => {
+    if (isRunning) {
+      timerRef.current = setInterval(() => {
+        setElapsedMs(prev => prev + 10);
+      }, 10);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRunning]);
+
+  const pad = (num: number, size: number) => {
+    let s = String(num);
+    while (s.length < size) s = "0" + s;
+    return s;
+  };
+
+  const formatTime = (ms: number) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    const milliseconds = Math.floor((ms % 1000) / 10);
+    return `${pad(hours,2)}:${pad(minutes,2)}:${pad(seconds,2)}.${pad(milliseconds,2)}`;
+  };
+
+  const saveRecord = () => {
+    const newRecord = {
+      date: today,
+      memo: memo,
+      tags: tags.split(',').map(tag => tag.trim()),
+      timeMs: stoppedElapsedMs,
+    };
+    const newRecords = [...records, newRecord];
+    setRecords(newRecords);
+    localStorage.setItem('records', JSON.stringify(newRecords));
+    setIsModalOpen(false);
+    setElapsedMs(0);
+    setStoppedElapsedMs(0);
+    setMemo('');
+    setTags('');
+  };
+
+  // ログインチェック処理
+  const handleLogin = () => {
+    if (usernameInput === correctUsername && passwordInput === correctPassword) {
+      setIsLoggedIn(true);
+    } else {
+      alert('ユーザー名またはパスワードが違います');
+    }
+  };
+
+  // まだログインしてない場合、ログイン画面を表示
+  if (!isLoggedIn) {
+    return (
+      <main className="flex flex-col items-center justify-center min-h-screen p-8">
+        <h1 className="text-3xl font-bold mb-6">ログイン</h1>
+        <input
+          type="text"
+          placeholder="ユーザー名"
+          value={usernameInput}
+          onChange={(e) => setUsernameInput(e.target.value)}
+          className="w-80 border border-gray-300 rounded p-2 mb-4"
+        />
+        <input
+          type="password"
+          placeholder="パスワード"
+          value={passwordInput}
+          onChange={(e) => setPasswordInput(e.target.value)}
+          className="w-80 border border-gray-300 rounded p-2 mb-6"
+        />
+        <button
+          className="w-80 bg-blue-500 text-white py-2 rounded"
+          onClick={handleLogin}
+        >
+          ログイン
+        </button>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    );
+  }
+
+  // ログイン後はタイマー画面を表示
+  return (
+    <main className="flex flex-col items-center justify-center min-h-screen p-8">
+      <h1 className="text-4xl font-bold mb-4">Live My Life</h1>
+      <h2 className="text-2xl mb-2">{today}</h2>
+
+      <div className="text-3xl mb-8">
+        {formatTime(elapsedMs)}
+      </div>
+
+      <button
+        className={`px-6 py-3 rounded-lg text-white text-lg ${
+          isRunning ? 'bg-red-500' : 'bg-green-500'
+        }`}
+        onClick={() => {
+          if (isRunning) {
+            setIsRunning(false);
+            setStoppedElapsedMs(elapsedMs);
+            setIsModalOpen(true);
+          } else {
+            setElapsedMs(0);
+            setIsRunning(true);
+          }
+        }}
+      >
+        {isRunning ? 'ストップ' : 'スタート'}
+      </button>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg w-80">
+            <h3 className="text-xl font-bold mb-4">作業記録</h3>
+            <div className="text-lg mb-2">作業時間: {formatTime(stoppedElapsedMs)}</div>
+            <textarea
+              placeholder="作業内容を入力..."
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              className="w-full border border-gray-300 rounded p-2 mb-4"
+              rows={3}
+            />
+            <input
+              type="text"
+              placeholder="タグ（カンマ区切り）"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="w-full border border-gray-300 rounded p-2 mb-4"
+            />
+            <button
+              className="w-full bg-blue-500 text-white py-2 rounded"
+              onClick={saveRecord}
+            >
+              保存する
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-2xl mt-12">
+        <h2 className="text-2xl font-bold mb-4">記録一覧</h2>
+        {records.length === 0 ? (
+          <p className="text-gray-500">まだ記録がありません</p>
+        ) : (
+          <ul className="space-y-4">
+            {records.map((record, index) => (
+              <li key={index} className="p-4 border rounded-lg shadow">
+                <div className="text-sm text-gray-500 mb-1">{record.date}</div>
+                <div className="text-lg font-semibold mb-1">{record.memo || '(メモなし)'}</div>
+                <div className="text-sm text-gray-700 mb-1">
+                  タグ: {record.tags.length > 0 ? record.tags.join(', ') : '(なし)'}
+                </div>
+                <div className="text-sm text-gray-700">
+                  時間: {formatTime(record.timeMs)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </main>
   );
 }
