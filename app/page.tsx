@@ -8,8 +8,10 @@ export default function Home() {
   const [passwordInput, setPasswordInput] = useState('');
 
   const [isRunning, setIsRunning] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [stoppedElapsedMs, setStoppedElapsedMs] = useState(0);
+
   const [today, setToday] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [memo, setMemo] = useState('');
@@ -33,7 +35,9 @@ export default function Home() {
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
-        setElapsedMs((prev) => prev + 10);
+        if (startTime !== null) {
+          setElapsedMs(Date.now() - startTime);
+        }
       }, 10);
     } else {
       if (timerRef.current) {
@@ -45,11 +49,11 @@ export default function Home() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isRunning]);
+  }, [isRunning, startTime]);
 
   const pad = (num: number, size: number) => {
     let s = String(num);
-    while (s.length < size) s = '0' + s;
+    while (s.length < size) s = "0" + s;
     return s;
   };
 
@@ -58,14 +62,14 @@ export default function Home() {
     const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((ms % (1000 * 60)) / 1000);
     const milliseconds = Math.floor((ms % 1000) / 10);
-    return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)}.${pad(milliseconds, 2)}`;
+    return `${pad(hours,2)}:${pad(minutes,2)}:${pad(seconds,2)}.${pad(milliseconds,2)}`;
   };
 
   const saveRecord = () => {
     const newRecord = {
       date: today,
       memo: memo,
-      tags: tags.split(',').map((tag) => tag.trim()),
+      tags: tags.split(',').map(tag => tag.trim()),
       timeMs: stoppedElapsedMs,
     };
     const newRecords = [...records, newRecord];
@@ -76,21 +80,31 @@ export default function Home() {
     setStoppedElapsedMs(0);
     setMemo('');
     setTags('');
+    setStartTime(null);
   };
 
-  // ログインチェック処理
   const handleLogin = () => {
-    if (
-      usernameInput === correctUsername &&
-      passwordInput === correctPassword
-    ) {
+    if (usernameInput === correctUsername && passwordInput === correctPassword) {
       setIsLoggedIn(true);
     } else {
       alert('ユーザー名またはパスワードが違います');
     }
   };
 
-  // まだログインしてない場合、ログイン画面を表示
+  const startTimer = () => {
+    setStartTime(Date.now());
+    setElapsedMs(0);
+    setIsRunning(true);
+  };
+
+  const stopTimer = () => {
+    setIsRunning(false);
+    if (startTime !== null) {
+      setStoppedElapsedMs(Date.now() - startTime);
+    }
+    setIsModalOpen(true);
+  };
+
   if (!isLoggedIn) {
     return (
       <main className="flex flex-col items-center justify-center min-h-screen p-8">
@@ -119,13 +133,14 @@ export default function Home() {
     );
   }
 
-  // ログイン後はタイマー画面を表示
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-8">
       <h1 className="text-4xl font-bold mb-4">Live My Life</h1>
       <h2 className="text-2xl mb-2">{today}</h2>
 
-      <div className="text-3xl mb-8">{formatTime(elapsedMs)}</div>
+      <div className="text-3xl mb-8">
+        {formatTime(elapsedMs)}
+      </div>
 
       <button
         className={`px-6 py-3 rounded-lg text-white text-lg ${
@@ -133,12 +148,9 @@ export default function Home() {
         }`}
         onClick={() => {
           if (isRunning) {
-            setIsRunning(false);
-            setStoppedElapsedMs(elapsedMs);
-            setIsModalOpen(true);
+            stopTimer();
           } else {
-            setElapsedMs(0);
-            setIsRunning(true);
+            startTimer();
           }
         }}
       >
@@ -149,9 +161,7 @@ export default function Home() {
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center">
           <div className="bg-white p-8 rounded-lg w-80">
             <h3 className="text-xl font-bold mb-4">作業記録</h3>
-            <div className="text-lg mb-2">
-              作業時間: {formatTime(stoppedElapsedMs)}
-            </div>
+            <div className="text-lg mb-2">作業時間: {formatTime(stoppedElapsedMs)}</div>
             <textarea
               placeholder="作業内容を入力..."
               value={memo}
@@ -176,21 +186,20 @@ export default function Home() {
         </div>
       )}
 
-      <div className="flex justify-end mb-4">
-        <button
-          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          onClick={() => {
-            if (confirm('本当に全記録を削除しますか？')) {
-              localStorage.removeItem('records');
-              setRecords([]);
-            }
-          }}
-        >
-          全記録を削除
-        </button>
-      </div>
-
       <div className="w-full max-w-2xl mt-12">
+        <div className="flex justify-end mb-4">
+          <button
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            onClick={() => {
+              if (confirm('本当に全記録を削除しますか？')) {
+                localStorage.removeItem('records');
+                setRecords([]);
+              }
+            }}
+          >
+            全記録を削除
+          </button>
+        </div>
         <h2 className="text-2xl font-bold mb-4">記録一覧</h2>
         {records.length === 0 ? (
           <p className="text-gray-500">まだ記録がありません</p>
@@ -199,12 +208,9 @@ export default function Home() {
             {records.map((record, index) => (
               <li key={index} className="p-4 border rounded-lg shadow">
                 <div className="text-sm text-gray-500 mb-1">{record.date}</div>
-                <div className="text-lg font-semibold mb-1">
-                  {record.memo || '(メモなし)'}
-                </div>
+                <div className="text-lg font-semibold mb-1">{record.memo || '(メモなし)'}</div>
                 <div className="text-sm text-gray-700 mb-1">
-                  タグ:{' '}
-                  {record.tags.length > 0 ? record.tags.join(', ') : '(なし)'}
+                  タグ: {record.tags.length > 0 ? record.tags.join(', ') : '(なし)'}
                 </div>
                 <div className="text-sm text-gray-700">
                   時間: {formatTime(record.timeMs)}
